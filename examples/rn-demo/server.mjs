@@ -29,7 +29,7 @@ await app.register(fastifySwagger, {
   openapi: {
     openapi: "3.0.3",
     info: {
-      title: "PulseVault RN Demo",
+      title: "PulseVault Fastify",
       description:
         "Reference server pairing the React Native demo app with `@mieweb/pulsevault`.",
       version: "0.0.1",
