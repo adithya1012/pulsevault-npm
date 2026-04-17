@@ -1,5 +1,6 @@
 import path from "node:path";
 import { readFileSync } from "node:fs";
+import { readdir, readFile, stat } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
 
@@ -20,22 +21,64 @@ const app = Fastify({
   bodyLimit: 16 * 1024 * 1024, // max single PATCH chunk (RN app sends 1 MB chunks)
 });
 
-const qrcodeJs = readFileSync(
-  path.join(__dirname, "public/qrcode.min.js"),
-  "utf8",
-);
-
 // Serve pairing page before the plugin so it isn't swallowed by /:videoid
 app.get("/", (_req, reply) => reply.type("text/html").send(html));
-app.get("/qrcode.min.js", (_req, reply) =>
-  reply.type("application/javascript").send(qrcodeJs),
-);
 
 // Reserve a videoid for an upload. The server owns ID generation so it can
 // later attach auth tokens, quotas, or other server-side state here.
 app.post("/reserve", async (_req, reply) => {
   const videoid = randomUUID();
   return reply.send({ videoid });
+});
+
+// List all uploaded videos under dataDir. The TUS file-store layout is
+// data/<videoid>/video/<videoid>.<ext>(+ .json sidecar with metadata).
+app.get("/videos", async (_req, reply) => {
+  let entries;
+  try {
+    entries = await readdir(dataDir, { withFileTypes: true });
+  } catch (err) {
+    if (err.code === "ENOENT") return reply.send([]);
+    throw err;
+  }
+
+  const videos = await Promise.all(
+    entries
+      .filter((e) => e.isDirectory())
+      .map(async (e) => {
+        const videoid = e.name;
+        const videoDir = path.join(dataDir, videoid, "video");
+        let files;
+        try {
+          files = await readdir(videoDir);
+        } catch {
+          return null;
+        }
+        const mp4 = files.find((f) => f.endsWith(".mp4") && !f.endsWith(".mp4.json"));
+        if (!mp4) return null;
+
+        const mp4Path = path.join(videoDir, mp4);
+        const jsonPath = `${mp4Path}.json`;
+        const [mp4Stat, meta] = await Promise.all([
+          stat(mp4Path).catch(() => null),
+          readFile(jsonPath, "utf8").then(JSON.parse).catch(() => null),
+        ]);
+        if (!mp4Stat || mp4Stat.size === 0) return null;
+
+        return {
+          videoid,
+          filename: meta?.metadata?.filename ?? mp4,
+          size: mp4Stat.size,
+          creation_date: meta?.creation_date ?? mp4Stat.birthtime.toISOString(),
+        };
+      }),
+  );
+
+  return reply.send(
+    videos
+      .filter(Boolean)
+      .sort((a, b) => b.creation_date.localeCompare(a.creation_date)),
+  );
 });
 
 // Return pre-built deep links for the pairing page.
