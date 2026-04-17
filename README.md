@@ -228,4 +228,4 @@ app.get("/admin/video/:id", async (req, reply) => {
 
 ## License
 
-ISC
+MIT
