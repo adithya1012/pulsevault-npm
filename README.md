@@ -349,4 +349,6 @@ app.get("/admin/video/:id", async (req, reply) => {
 
 ## License
 
-MIT
+Source Available — free for non-commercial use under the terms in [LICENSE](LICENSE), which also requires that redistributions be published under an OSI-approved open source license. Commercial use requires a separate license from Medical Informatics Engineering, LLC — contact [helpdesk@mieweb.com](mailto:helpdesk@mieweb.com) or [mieweb.com](https://www.mieweb.com).
+
+Copyright © 2026 Medical Informatics Engineering, LLC. All rights reserved.
